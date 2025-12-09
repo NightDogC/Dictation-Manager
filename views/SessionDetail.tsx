@@ -3,7 +3,7 @@ import { Session, Attempt } from '../types';
 import { Button, Card } from '../components/Button';
 import { DiffViewer } from '../components/DiffViewer';
 import { ArrowLeft, Save, Edit2, History, AlertCircle } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid'; // Since we can't install uuid, I'll use a simple random string generator in this file.
+import { v4 as uuidv4 } from 'uuid'; 
 
 // Simple ID generator since we can't rely on external packages for this specific file
 const generateId = () => Math.random().toString(36).substring(2, 15);
@@ -12,9 +12,17 @@ interface SessionDetailProps {
   session: Session;
   onUpdateSession: (updatedSession: Session) => void;
   onBack: () => void;
+  properNouns: string[];
+  onAddProperNoun: (word: string) => void;
 }
 
-export const SessionDetail: React.FC<SessionDetailProps> = ({ session, onUpdateSession, onBack }) => {
+export const SessionDetail: React.FC<SessionDetailProps> = ({ 
+  session, 
+  onUpdateSession, 
+  onBack,
+  properNouns,
+  onAddProperNoun
+}) => {
   // Local state for inputs
   const [dictationInput, setDictationInput] = useState('');
   const [originalInput, setOriginalInput] = useState(session.originalText || '');
@@ -46,12 +54,6 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ session, onUpdateS
   const latestAttempt = session.attempts[session.attempts.length - 1];
   
   // Decide what to show based on state
-  // If we have just finished an attempt (saved it), we should be in REVIEW or INPUT_ORIGINAL
-  // However, the prompt says: "When re-entering... hide previous... provide new input box".
-  // So 'INPUT_DICTATION' is the default entry state.
-  
-  // Handling the transition to "Review"
-  // We need a local state to track if we represent the *just submitted* attempt or if we are idle.
   const [currentAttemptId, setCurrentAttemptId] = useState<string | null>(null);
   
   const currentReviewAttempt = session.attempts.find(a => a.id === currentAttemptId);
@@ -202,7 +204,9 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ session, onUpdateS
              {session.originalText && (
                <DiffViewer 
                  userText={currentReviewAttempt.userText} 
-                 originalText={session.originalText} 
+                 originalText={session.originalText}
+                 properNouns={properNouns}
+                 onAddProperNoun={onAddProperNoun}
                />
              )}
           </Card>
@@ -210,7 +214,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ session, onUpdateS
            {/* User's Raw Input Display (Optional reference) */}
            <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
               <h4 className="text-xs font-uppercase font-bold text-slate-400 mb-2 uppercase tracking-wide">Your Raw Input</h4>
-              <p className="text-slate-600">{currentReviewAttempt.userText}</p>
+              <p className="text-slate-600 break-words">{currentReviewAttempt.userText}</p>
            </div>
         </div>
       )}
@@ -231,7 +235,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ session, onUpdateS
                   <span>{new Date(attempt.timestamp).toLocaleString()}</span>
                   {attempt.id === currentAttemptId && <span className="text-indigo-600 font-bold">LATEST</span>}
                 </div>
-                <p className="text-slate-700 line-clamp-2">{attempt.userText}</p>
+                <p className="text-slate-700 line-clamp-2 break-words">{attempt.userText}</p>
               </div>
             ))
           )}

@@ -3,6 +3,7 @@ import { DiffPart, Session } from './types';
 // --- Local Storage Helpers ---
 
 const STORAGE_KEY = 'dictation_master_data_v1';
+const PROPER_NOUNS_KEY = 'dictation_proper_nouns_v1';
 
 export const loadSessions = (): Session[] => {
   try {
@@ -22,6 +23,51 @@ export const saveSessions = (sessions: Session[]) => {
   }
 };
 
+export const loadProperNouns = (): string[] => {
+  try {
+    const data = localStorage.getItem(PROPER_NOUNS_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch (e) {
+    return [];
+  }
+};
+
+export const saveProperNouns = (nouns: string[]) => {
+  try {
+    localStorage.setItem(PROPER_NOUNS_KEY, JSON.stringify(nouns));
+  } catch (e) {
+    console.error("Failed to save proper nouns", e);
+  }
+};
+
+// --- Helper: Levenshtein Distance & Accuracy ---
+
+const getLevenshteinDistance = (a: string, b: string): number => {
+  const matrix = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
+
+  for (let i = 0; i <= a.length; i++) matrix[i][0] = i;
+  for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
+
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,       // deletion
+        matrix[i][j - 1] + 1,       // insertion
+        matrix[i - 1][j - 1] + cost // substitution
+      );
+    }
+  }
+  return matrix[a.length][b.length];
+};
+
+const getLetterAccuracy = (word1: string, word2: string): number => {
+  const maxLength = Math.max(word1.length, word2.length);
+  if (maxLength === 0) return 1.0;
+  const distance = getLevenshteinDistance(word1, word2);
+  return 1 - (distance / maxLength);
+};
+
 // --- Word Diff Algorithm (LCS based) ---
 
 const tokenize = (text: string): string[] => {
@@ -33,7 +79,7 @@ const cleanWord = (word: string): string => {
   return word.replace(/[^\w]|_/g, '').toLowerCase();
 };
 
-export const calculateDiff = (userText: string, originalText: string): DiffPart[] => {
+export const calculateDiff = (userText: string, originalText: string, properNouns: string[] = []): DiffPart[] => {
   const userWords = tokenize(userText);
   const originalWords = tokenize(originalText);
 
@@ -45,10 +91,23 @@ export const calculateDiff = (userText: string, originalText: string): DiffPart[
 
   for (let i = 1; i <= n; i++) {
     for (let j = 1; j <= m; j++) {
-      const u = cleanWord(userWords[i - 1]);
-      const o = cleanWord(originalWords[j - 1]);
+      const uRaw = userWords[i - 1];
+      const oRaw = originalWords[j - 1];
+      const u = cleanWord(uRaw);
+      const o = cleanWord(oRaw);
 
-      if (u === o) {
+      // Check Exact Match OR Proper Noun Fuzzy Match
+      let isMatch = u === o;
+      
+      if (!isMatch && properNouns.includes(o)) {
+        // If the original word is a marked proper noun, check if user typed it with >= 60% accuracy
+        const accuracy = getLetterAccuracy(u, o);
+        if (accuracy >= 0.60) {
+          isMatch = true;
+        }
+      }
+
+      if (isMatch) {
         dp[i][j] = dp[i - 1][j - 1] + 1;
       } else {
         dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
@@ -64,11 +123,19 @@ export const calculateDiff = (userText: string, originalText: string): DiffPart[
   while (i > 0 || j > 0) {
     const uRaw = i > 0 ? userWords[i - 1] : '';
     const oRaw = j > 0 ? originalWords[j - 1] : '';
-    const u = i > 0 ? cleanWord(uRaw) : null;
-    const o = j > 0 ? cleanWord(oRaw) : null;
+    const u = i > 0 ? cleanWord(uRaw) : '';
+    const o = j > 0 ? cleanWord(oRaw) : '';
 
-    if (i > 0 && j > 0 && u === o) {
-      // Match found (ignoring punctuation)
+    // Check Match condition again for backtracking
+    let isMatch = (i > 0 && j > 0) && (u === o);
+    if (i > 0 && j > 0 && !isMatch && properNouns.includes(o)) {
+        if (getLetterAccuracy(u, o) >= 0.60) {
+            isMatch = true;
+        }
+    }
+
+    if (isMatch) {
+      // Match found
       // We use the original text's formatting for the match
       rawParts.unshift({ type: 'match', value: originalWords[j - 1] });
       i--;
@@ -100,7 +167,7 @@ export const calculateDiff = (userText: string, originalText: string): DiffPart[
 export const calculateAccuracy = (diffs: DiffPart[]): number => {
   const totalWords = diffs.length;
   if (totalWords === 0) return 100;
-  // Count matches (which now include ignored punctuation errors)
+  // Count matches
   const matches = diffs.filter(d => d.type === 'match').length;
   return Math.round((matches / totalWords) * 100);
 };

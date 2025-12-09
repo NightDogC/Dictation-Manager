@@ -1,20 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Session, AppState } from './types';
-import { loadSessions, saveSessions } from './utils';
+import { loadSessions, saveSessions, loadProperNouns, saveProperNouns } from './utils';
 import { Home } from './views/Home';
 import { SessionDetail } from './views/SessionDetail';
 import { Download, Upload } from 'lucide-react';
 
 const App: React.FC = () => {
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [properNouns, setProperNouns] = useState<string[]>([]);
   const [currentView, setCurrentView] = useState<'HOME' | 'SESSION'>('HOME');
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize data
   useEffect(() => {
-    const loaded = loadSessions();
-    setSessions(loaded);
+    setSessions(loadSessions());
+    setProperNouns(loadProperNouns());
   }, []);
 
   // Persist on change
@@ -23,6 +24,12 @@ const App: React.FC = () => {
       saveSessions(sessions);
     }
   }, [sessions]);
+
+  // Persist Proper Nouns
+  useEffect(() => {
+    // We save even empty arrays to ensure key exists or cleared if needed
+    saveProperNouns(properNouns);
+  }, [properNouns]);
 
   const handleCreateSession = () => {
     // Find next ID
@@ -48,6 +55,13 @@ const App: React.FC = () => {
     setSessions(prev => prev.map(s => s.id === updatedSession.id ? updatedSession : s));
   };
 
+  const handleAddProperNoun = (word: string) => {
+    const lower = word.toLowerCase();
+    if (!properNouns.includes(lower)) {
+      setProperNouns(prev => [...prev, lower]);
+    }
+  };
+
   const handleBackToHome = () => {
     setCurrentView('HOME');
     setActiveSessionId(null);
@@ -56,7 +70,14 @@ const App: React.FC = () => {
   // --- Export / Import Logic ---
 
   const handleExportData = () => {
-    const dataStr = JSON.stringify(sessions, null, 2);
+    // Bundle both sessions and properNouns
+    const exportData = {
+      version: 2,
+      sessions,
+      properNouns
+    };
+    
+    const dataStr = JSON.stringify(exportData, null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -82,21 +103,35 @@ const App: React.FC = () => {
         const content = e.target?.result as string;
         const parsed = JSON.parse(content);
         
+        let newSessions: Session[] = [];
+        let newProperNouns: string[] = [];
+
+        // Check format
         if (Array.isArray(parsed)) {
-          // Simple validation: check if it looks like an array of objects
-          if (window.confirm(`Found ${parsed.length} records. This will overwrite your current data. Continue?`)) {
-             setSessions(parsed);
-             saveSessions(parsed); // Force save immediately
-             alert("Data imported successfully!");
-             // Reset view to home to reflect changes
-             handleBackToHome();
-          }
+          // Legacy format (just sessions array)
+          newSessions = parsed;
+          newProperNouns = properNouns; // keep existing
+        } else if (parsed.sessions && Array.isArray(parsed.sessions)) {
+          // New format
+          newSessions = parsed.sessions;
+          newProperNouns = Array.isArray(parsed.properNouns) ? parsed.properNouns : [];
         } else {
-          alert("Invalid file format: Expected a list of sessions.");
+          throw new Error("Invalid format");
+        }
+
+        if (window.confirm(`Found ${newSessions.length} records. This will overwrite your current data. Continue?`)) {
+           setSessions(newSessions);
+           setProperNouns(newProperNouns);
+           
+           saveSessions(newSessions); 
+           saveProperNouns(newProperNouns);
+           
+           alert("Data imported successfully!");
+           handleBackToHome();
         }
       } catch (err) {
         console.error(err);
-        alert("Failed to parse file. Please select a valid JSON backup.");
+        alert("Failed to parse file. Please select a valid backup JSON.");
       }
     };
     reader.readAsText(file);
@@ -169,6 +204,8 @@ const App: React.FC = () => {
             session={activeSession}
             onUpdateSession={handleUpdateSession}
             onBack={handleBackToHome}
+            properNouns={properNouns}
+            onAddProperNoun={handleAddProperNoun}
           />
         )}
       </main>
