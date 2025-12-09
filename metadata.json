@@ -1,0 +1,5 @@
+{
+  "name": "DictationMaster",
+  "description": "A daily English dictation management tool featuring word-level error comparison, history tracking, and a game-like progression interface.",
+  "requestFramePermissions": []
+}
