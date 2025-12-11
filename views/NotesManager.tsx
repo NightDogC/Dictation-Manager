@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Note } from '../types';
 import { Button } from '../components/Button';
-import { ArrowLeft, Trash2, Edit2, Plus, Search } from 'lucide-react';
+import { ArrowLeft, Trash2, Edit2, Plus, Search, X, Check } from 'lucide-react';
 
 interface NotesManagerProps {
   notes: Note[];
@@ -19,6 +19,7 @@ export const NotesManager: React.FC<NotesManagerProps> = ({
   onAddNote
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const filteredNotes = notes
     .filter(n => n.content.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -83,23 +84,61 @@ export const NotesManager: React.FC<NotesManagerProps> = ({
                 <span className="text-xs text-yellow-700 font-medium">
                     {new Date(note.updatedAt).toLocaleDateString()}
                 </span>
-                <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button 
-                        onClick={() => onEditNote(note)}
-                        className="p-1.5 text-yellow-700 hover:bg-yellow-200 rounded-md transition-colors"
-                        title="Edit"
-                    >
-                        <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button 
-                        onClick={() => {
-                            if(window.confirm('Delete this note?')) onDeleteNote(note.id);
-                        }}
-                        className="p-1.5 text-yellow-700 hover:bg-red-100 hover:text-red-600 rounded-md transition-colors"
-                        title="Delete"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                    </button>
+                
+                <div className="flex items-center space-x-1 z-10">
+                    {deleteConfirmId === note.id ? (
+                        <>
+                            <span className="text-xs text-red-600 font-bold mr-1">Delete?</span>
+                            <button 
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDeleteNote(note.id);
+                                    setDeleteConfirmId(null);
+                                }}
+                                className="p-1.5 bg-red-100 text-red-600 hover:bg-red-200 rounded-md transition-colors"
+                                title="Confirm Delete"
+                            >
+                                <Check className="w-4 h-4" />
+                            </button>
+                            <button 
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeleteConfirmId(null);
+                                }}
+                                className="p-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-md transition-colors"
+                                title="Cancel"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <button 
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onEditNote(note);
+                                }}
+                                className="p-1.5 text-yellow-700 hover:bg-yellow-200 rounded-md transition-colors"
+                                title="Edit"
+                            >
+                                <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button 
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeleteConfirmId(note.id);
+                                }}
+                                className="p-1.5 text-yellow-700 hover:bg-red-100 hover:text-red-600 rounded-md transition-colors"
+                                title="Delete"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </button>
+                        </>
+                    )}
                 </div>
               </div>
             </div>
