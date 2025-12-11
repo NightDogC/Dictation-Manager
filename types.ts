@@ -17,6 +17,13 @@ export interface Session {
   attempts: Attempt[];
 }
 
+export interface Note {
+  id: string;
+  content: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface AppState {
   sessions: Session[];
 }

@@ -1,9 +1,10 @@
-import { DiffPart, Session } from './types';
+import { DiffPart, Session, Note } from './types';
 
 // --- Local Storage Helpers ---
 
 const STORAGE_KEY = 'dictation_master_data_v1';
 const PROPER_NOUNS_KEY = 'dictation_proper_nouns_v1';
+const NOTES_KEY = 'dictation_notes_v1';
 
 export const loadSessions = (): Session[] => {
   try {
@@ -37,6 +38,23 @@ export const saveProperNouns = (nouns: string[]) => {
     localStorage.setItem(PROPER_NOUNS_KEY, JSON.stringify(nouns));
   } catch (e) {
     console.error("Failed to save proper nouns", e);
+  }
+};
+
+export const loadNotes = (): Note[] => {
+  try {
+    const data = localStorage.getItem(NOTES_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch (e) {
+    return [];
+  }
+};
+
+export const saveNotes = (notes: Note[]) => {
+  try {
+    localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
+  } catch (e) {
+    console.error("Failed to save notes", e);
   }
 };
 
